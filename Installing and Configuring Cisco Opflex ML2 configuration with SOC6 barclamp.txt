@@ -63,8 +63,18 @@ Prerequsites
             # zypper in openvswitch-gbp openvswitch-gbp-switch openvswitch-gbp-kmp-default
             # modinfo openswitch 
                 version must be 2.4.1.gbp
+
+4. Create required ovs bridges
+    - on control node:
+        # systemctl start openvswitch
+        # ovs-vsctl add-br br-int
+    - on compute nodes:
+        # systemctl start openvswitch
+        # ovs-vsctl add-br br-int
+        # ovs-vsctl set bridge br-int protocols=[]
+        # ovs-vsctl add-port br-int br-int_vxlan0 -- set Interface br-int_vxlan0 type=vxlan options:remote_ip=flow options:key=flow options:dst_port=8472
                 
-4. On compute nodes
+5. On compute nodes
     # zypper in lldpd
     # systemctl start lldpd.service
     # lldpctl
@@ -171,9 +181,6 @@ Failed to apply the proposal to: dcc-46-d6-c0-6a-87.cloud.cisco-aci.lab
                     type_drivers = opflex,flat changed to type_drivers = opflex,local,flat,vlan,gre,vxlan
                 /etc/neutron/dhcp_agent.ini
                     uncomment ovs_integration_bridge = br-int
-            on compute nodes
-                # ovs-vsctl set bridge br-int protocols=[]
-                # ovs-vsctl add-port br-int br-int_vxlan0 -- set Interface br-int_vxlan0 type=vxlan options:remote_ip=flow options:key=flow options:dst_port=8472
             Start openstack-neutron-dhcp-agent.service and openstack-neutron.service on control node
             Start neutron-opflex-agent and agent-ovs on compute nodes
          created net101 and it is vxlan
