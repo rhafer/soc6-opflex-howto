@@ -24,8 +24,7 @@ Future versions of this document will address (in no particular order):
     
 
 Prerequsites
-    Start with a newly installed SOC6 with the barclamps deployed.
-        NOTE: This document does not explain how to install SOC6 but all barclamps up to and including horizon should be deployed.
+    Start with a newly installed SOC6 with all nodes discovered and allocated.  (None of the openstack barclamps deployed yet)
         NOTE: This document assumes 192.168.124.0/24 for the admin network
         
 1. Be sure the control node has an IP address that allows it to communicate to the Cisco APIC.
