@@ -82,56 +82,64 @@ Prerequsites
     - Make a note of PortDescr: line for the eth interface(s) on the ACI fabric. An exmaple is:
         topology/pod-1/paths-101/pathep-[eth1/33]
 
-5. Deploy all pertainent OpenStack barclamps using Crowbar web interface.  For the Neutron barclamp:
-    - Start by using the web interface for the Neutron barclamp:
-        - Create the barclamp proposal
-        - The following selections are important to get exact for Cisco ACI:
-            - Plugin: ml2
-            - Modular Layer 2 mechanism drivers: cisco_apic_ml2
-            - Modular Layer 2 type drivers: opflex, vlan, vxlan
-                HINT: Hold down the Ctrl key to select multiple
-            - Default type driver for provider network: opflex
-            - Default type driver for tenant network: opflex
-        - Save but DO NOT APPLY the neutron barclamp
-    - ssh to the admin node
+6. Deploy all pertainent OpenStack barclamps using Crowbar web interface.  For the Neutron barclamp:
+    Create a proposal and click on "raw" to edit the attributes in raw mode. Or on the command line:
+        # crowbar neutron proposal create default
         # crowbar neutron proposal edit default
-            - find "neutron":
-                Should be about fifth line from the top
-            - insert a new line after "neutron":
-            - paste the following lines exactly as shown with leading spaces included:
-      "apic": {
-        "hosts": "10.105.1.10",
-        "system_id": "soc6",
-        "username": "admin",
-        "password": "cisco123"
-      },
-      "apic_switches": {
-        "101": {
-          "switch_ports": {
-            "d58-ac-78-f2-61-6d": {
-              "switch_port": "1/2"
+
+    Set the following values (leave everything else set to the defaults):
+        "neutron": {
+            "create_default_networks": false,
+            "dhcp_domain": "cloud.cisco-aci.lab",
+            "use_lbaas": false,
+            "ml2_mechanism_drivers": [
+                "cisco_apic_ml2"
+            ],
+            "ml2_type_drivers": [
+                "opflex",
+                "vxlan",
+                "vlan"
+            ],
+            "ml2_type_drivers_default_provider_network": "opflex",
+            "ml2_type_drivers_default_tenant_network": "opflex",
+            "apic": {
+                "hosts": "10.105.1.10",
+                "system_id": "soc6",
+                "username": "admin",
+                "password": "cisco123"
             },
-            "dcc-46-d6-c0-6a-87": {
-              "switch_port": "1/33"
-            } 
-          } 
+            "apic_switches": {
+                "101": {
+                    "switch_ports": {
+                        "d58-ac-78-f2-61-6d": {
+                            "switch_port": "1/2"
+                        },
+                        "dcc-46-d6-c0-6a-87": {
+                            "switch_port": "1/33"
+                        } 
+                    } 
+                }
+            }
         }
-      },
-            - Edit the hosts, system_id, username, password and apic_switches to match ACI fabric
-                For the apic_switches section:
-                    - Update 101 and create any new sections like 101 to match number(s) in paths-XXX
-                        Example: paths-101 and paths-102 would result in keeping the 101 section and adding a new 102 section
-                    - Update mac address entry with output for each host and the switch port it is connected to
-                        Example: get hostname of compute node by using "hostname" command and [eth1/33] from exmaple above would result in
-                            "dcc-46-d6-c0-6a-87": {
-                              "switch_port": "1/33"
-                            },
-                        Multiple <hostname> and switch_port combination can exist under apic_switches section
-            - Save the changes
-            - Return to the Crowbar web interface and apply the neutron barclamp
-                *** FAILED - SEE TROUBLESHOOTING SECTION
+
+        - Edit the hosts, system_id, username, password and apic_switches to match ACI fabric
+            For the apic_switches section:
+                - Update 101 and create any new sections like 101 to match number(s) in paths-XXX
+                    Example: paths-101 and paths-102 would result in keeping the 101 section and adding a new 102 section
+                - Update mac address entry with output for each host and the switch port it is connected to
+                    Example: get hostname of compute node by using "hostname" command and [eth1/33] from exmaple above would result in
+                        "dcc-46-d6-c0-6a-87": {
+                          "switch_port": "1/33"
+                        },
+                    Multiple <hostname> and switch_port combination can exist under apic_switches section
+        - Save the changes
+        - Edit the deployment if the automatic selection somehow didn't work (drag and drop nodes to the different roles as required)
+        - Apply either by clicking "Apply" in the WebUI or by running:
+            # crowbar neutron proposal commit default
+        - Return to the Crowbar web interface and apply the neutron barclamp
+            *** FAILED - SEE TROUBLESHOOTING SECTION
                 
-6. In horizon dashboard
+7. In horizon dashboard
     - Create a new network (Project | Network | Networks)
     - Verify that the network is created in the APIC web interface under Tenants
     - Start instances on each compute node within the same project that are attached to the new network
