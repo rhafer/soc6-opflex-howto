@@ -1,0 +1,192 @@
+Installing and Configuring the Cisco Opflex ML2 Configuration with SUSE OPENSTACK CLOUD 6 barclamp
+Version 0.1
+Author: Mike Friesenegger (mikef@suse.com)
+
+
+
+This version of the document focuses are created a reproducible set of steps to deploy and provide a basic configuration of SOC6 with a Cisco ACI fabric.  This document has achieved:
+    - Cisco ACI ML2 Liberty driver implementation using SUSE built RPMs
+        http://download.opensuse.org/repositories/home:/rhafer:/branches:/Cloud:/OpenStack:/Liberty/SLE_12_SP1
+            # wget -r -N -np http://download.opensuse.org/repositories/home:/rhafer:/branches:/Cloud:/OpenStack:/Liberty/SLE_12_SP1") 
+                into /srv/tftpboot/suse-12.1/x86_64/repos/PTF/rpm/ on admin node
+            # createrepo-cloud-ptf on the admin node
+    - Integration with SOC6
+    - Deployment using SOC6 neutron barclamp
+    - Creation of OpenStack system object in the Cisco APIC
+    - Creation of the tenant and network in the Cisco APIC based on what was reated in the SOC6 horizon dashboard
+    - Ability to start instances on different compute nodes that can ping their gateway and each other
+    
+Future versions of this document will address (in no particular order):
+    - Communication of instances to external networks
+    - "Bonding" of NICs connected to ACI fabric
+    - HA of control plane and specifically Neutron server services
+
+    
+
+Prerequsites
+    Start with a newly installed SOC6 with the barclamps deployed.
+        NOTE: This document does not explain how to install SOC6 but all barclamps up to and including horizon should be deployed.
+        NOTE: This document assumes 192.168.124.0/24 for the admin network
+        
+1. Be sure the control node has an IP address that allows it to communicate to the Cisco APIC.
+    RECOMMENDATION: Use external network and crowbar network allocate_ip to assign ip to control node
+
+2. On compute nodes connected to the ACI fabric
+    - Go into YAST | System | Network Settings
+        Ignore chef client warning
+    - Select eth device connected to the ACI fabric
+    - Select "No Link and IP Setup"
+    - In General tab | Set MTU = 1600
+    - Save changes for that network device
+    - Add a vlan device
+    - Configuration name = vlan.4093
+    - Select eth device for "Real Interface for VLAN"
+    - Enter "4093" for the VLAN ID
+    - Select "Dynamic Address - DHCP"
+    - In General tab | Set MTU = 1600
+    - Save changes for new VLAN device
+    - Exit Network Settings
+    - Go back into Network Settings
+        Ignore chef client warning
+    - Go into Routing tab
+    - Add an entry to the Routing Table
+        Destination     224.0.0.0
+        Genmask         240.0.0.0
+        Gateway         0.0.0.0
+        Device          vlan.4093
+    - Save and exit Network Settings
+    - Exit YAST
+    - ip a show dev vlan.4093
+        - Verify that the interface has an IP address from the ACI fabric
+        
+3. Install openvswitch packages manually on control and compute nodes
+        openvswitch-gbp variants only
+            # zypper in openvswitch-gbp openvswitch-gbp-switch openvswitch-gbp-kmp-default
+                *** AUTOMATICALLY INSTALLING openvswitch-kmp-default BUT I BELIEVE YOU DO NOT WANT THAT
+            # modinfo openswitch 
+                version must be 2.4.1.gbp
+                
+4. On compute nodes
+    # zypper in lldpd
+    # systemctl start lldpd.service
+    # lldpctl
+        - Be patient because it take a time to scan LLDP neighbors
+    - Make a note of PortDescr: line for the eth interface(s) on the ACI fabric. An exmaple is:
+        topology/pod-1/paths-101/pathep-[eth1/33]
+
+5. Deploy all pertainent OpenStack barclamps using Crowbar web interface.  For the Neutron barclamp:
+    - Start by using the web interface for the Neutron barclamp:
+        - Create the barclamp proposal
+        - The following selections are important to get exact for Cisco ACI:
+            - Plugin: ml2
+            - Modular Layer 2 mechanism drivers: cisco_apic_ml2
+            - Modular Layer 2 type drivers: opflex, vlan, vxlan
+                HINT: Hold down the Ctrl key to select multiple
+            - Default type driver for provider network: opflex
+            - Default type driver for tenant network: opflex
+        - Save but DO NOT APPLY the neutron barclamp
+    - ssh to the admin node
+        # crowbar neutron proposal edit default
+            - find "neutron":
+                Should be about fifth line from the top
+            - insert a new line after "neutron":
+            - paste the following lines exactly as shown with leading spaces included:
+      "apic": {
+        "hosts": "10.105.1.10",
+        "system_id": "soc6",
+        "username": "admin",
+        "password": "cisco123"
+      },
+      "apic_switches": {
+        "101": {
+          "switch_ports": {
+            "d58-ac-78-f2-61-6d": {
+              "switch_port": "1/2"
+            },
+            "dcc-46-d6-c0-6a-87": {
+              "switch_port": "1/33"
+            } 
+          } 
+        }
+      },
+            - Edit the hosts, system_id, username, password and apic_switches to match ACI fabric
+                For the apic_switches section:
+                    - Update 101 and create any new sections like 101 to match number(s) in paths-XXX
+                        Example: paths-101 and paths-102 would result in keeping the 101 section and adding a new 102 section
+                    - Update mac address entry with output for each host and the switch port it is connected to
+                        Example: get hostname of compute node by using "hostname" command and [eth1/33] from exmaple above would result in
+                            "dcc-46-d6-c0-6a-87": {
+                              "switch_port": "1/33"
+                            },
+                        Multiple <hostname> and switch_port combination can exist under apic_switches section
+            - Save the changes
+            - Return to the Crowbar web interface and apply the neutron barclamp
+                *** FAILED - SEE TROUBLESHOOTING SECTION
+                
+6. In horizon dashboard
+    - Create a new network (Project | Network | Networks)
+    - Verify that the network is created in the APIC web interface under Tenants
+    - Start instances on each compute node within the same project that are attached to the new network
+    - Confirm the instances and ping their gateway and each other
+    
+    
+
+TROUBLESHOOTING FROM THIS ATTEMPT
+    - Applying the nova barclamp to both nodes at one time failed on first attempt to apply barclamp
+Failed to apply the proposal to: dcc-46-d6-c0-6a-87.cloud.cisco-aci.lab 
+[2016-06-21T14:48:53-07:00] ERROR: Running exception handlers 
+[2016-06-21T14:48:53-07:00] FATAL: Saving node information to /var/chef/cache/failed-run-data.json 
+[2016-06-21T14:48:53-07:00] ERROR: Exception handlers complete 
+[2016-06-21T14:48:53-07:00] FATAL: Stacktrace dumped to /var/chef/cache/chef-stacktrace.out 
+[2016-06-21T14:48:53-07:00] FATAL: Chef::Exceptions::Exec: service[nova-compute] (nova::compute line 23) had an error: Chef::Exceptions::Exec: /bin/systemctl start openstack-nova-compute returned 6, expected 0
+        systemctl lists no available openstack services
+        on compute01
+            # systemctl daemon-reload
+            # systemctl daemon-reexec
+        Reapplied barclamp but to only compute01 and it worked
+        Tried adding compute02 and reapply but it failed
+        Reapplied with only compute02 and it did not worked
+        Reapplied barclamp but to only compute01 and it worked
+        on compute02
+            # systemctl daemon-reload
+            # systemctl daemon-reexec
+        Added compute02, reapplied and it worked
+    - default router and networks were created
+        edited proposal, reapplied and default network still exist
+            "create_default_networks": false,
+        manually deleted and reapplied to see if they return
+            they did not return
+        WOULD YOU LIKE TO FIX IN DOCUMENTATION OR OTHER?
+    - Created net101 in horizon but APIC showed network as vlan but customer wants vxlan
+        deleted net101 and confirmed it removed from apic
+        edit neutron barclamp, deselect vlan from Modular Layer 2 type drivers and reapplied
+        recreated net101 and but still a vlan
+        removed vxlan from barclamp, only opflex for Modular Layer 2 type drivers and reapplied
+        recreated net101 and but still a vlan
+        created net102 and still a vlan
+        NEED TO LOOK INTO CONFIG FILES AS TO WHY THIS IS NOT VXLAN
+            disabled chef-client on control and compute nodes
+            Stop neutron-opflex-agent and agent-ovs on compute nodes
+            Stop openstack-neutron-dhcp-agent.service and openstack-neutron.service on control node
+            on control node
+                /etc/neutron/plugins/ml2/ml2_conf.ini
+                    type_drivers = opflex,flat changed to type_drivers = opflex,local,flat,vlan,gre,vxlan
+                /etc/neutron/dhcp_agent.ini
+                    uncomment ovs_integration_bridge = br-int
+            on compute nodes
+                # ovs-vsctl set bridge br-int protocols=[]
+                # ovs-vsctl add-port br-int br-int_vxlan0 -- set Interface br-int_vxlan0 type=vxlan options:remote_ip=flow options:key=flow options:dst_port=8472
+            Start openstack-neutron-dhcp-agent.service and openstack-neutron.service on control node
+            Start neutron-opflex-agent and agent-ovs on compute nodes
+         created net101 and it is vxlan
+    - Attempt to start instances and they will not start
+        Permissions error in /var/log/neutron/opflex-agent.log for /var/run/neutron
+            # mkdir /var/run/neutron
+            # chown neutron.neutron /var/run/neutron
+            # chown -R root.neutron /var/lib/opflex-agent-ovs/
+    - Instances start but do not get an ip address
+        /var/log/neutron/neutron-server.log errors
+2016-06-21 22:21:52.146 9921 INFO neutron.plugins.ml2.plugin [req-04bab362-a416-4250-875d-459ad5f4743a - - - - -] Attempt 9 to bind port 3f0ed47c-9f06-4043-85a8-011d06991851
+2016-06-21 22:21:52.151 9921 ERROR neutron.plugins.ml2.managers [req-04bab362-a416-4250-875d-459ad5f4743a - - - - -] Failed to bind port 3f0ed47c-9f06-4043-85a8-011d06991851 on host d52-54-00-08-dc-54 for vnic_type normal using segments [{'segmentation_id': None, 'physical_network': u'physnet1', 'id': u'b2cfb3da-7e50-4742-a0c0-5b53878f7f57', 'network_type': u'opflex'}]
+2016-06-21 22:21:52.151 9921 INFO neutron.plugins.ml2.plugin [req-04bab362-a416-4250-875d-459ad5f4743a - - - - -] Attempt 10 to bind port 3f0ed47c-9f06-4043-85a8-011d06991851
+2016-06-21 22:21:52.156 9921 ERROR neutron.plugins.ml2.managers [req-04bab362-a416-4250-875d-459ad5f4743a - - - - -] Failed to bind port 3f0ed47c-9f06-4043-85a8-011d06991851 on host d52-54-00-08-dc-54 for vnic_type normal using segments [{'segmentation_id': None, 'physical_network': u'physnet1', 'id': u'b2cfb3da-7e50-4742-a0c0-5b53878f7f57', 'network_type': u'opflex'}]

@@ -1,0 +1,295 @@
+Installing and Configuring the Cisco Opflex with SUSE OPENSTACK CLOUD 6
+Version 0.5
+Author: Mike Friesenegger (mikef@suse.com)
+
+
+
+This version of the document focuses are created a reproducible set of steps to deploy and provide a basic configuration of SOC6 with a Cisco ACI fabric.  This document has achieved:
+    - Cisco ACI GBP Liberty driver implementation using SUSE built RPMs
+        http://download.opensuse.org/repositories/home:/rhafer:/branches:/Cloud:/OpenStack:/Liberty/SLE_12_SP1
+            # wget -r -N -np http://download.opensuse.org/repositories/home:/rhafer:/branches:/Cloud:/OpenStack:/Liberty/SLE_12_SP1") 
+                into /srv/tftpboot/suse-12.1/x86_64/repos/PTF/rpm/
+            # createrepo-cloud-ptf on the admin node
+    - Integration with SOC6
+    - Creation of OpenStack system object in the Cisco APIC
+    - Creation of the tenant and network in the Cisco APIC based on what was reated in the SOC6 horizon dashboard
+    - Ability to start instances on different compute nodes that can ping their gateway and each other
+    
+Future versions of this document will address (in no particular order):
+    - Communication of instances to external networks
+    - "Bonding" of NICs connected to ACI fabric
+    - HA of control plane and specifically Neutron server services
+
+    
+
+Prerequsites
+    Start with a newly installed SOC6 with the barclamps deployed.
+        NOTE: This document does not explain how to install SOC6 but all barclamps up to and including horizon should be deployed.
+        NOTE: This document assumes 192.168.124.0/24 for the admin network
+
+1. Currently, Crowbar will overwrite important conf and ini file changes required by Cisco Opflex.  Disabling chef-server is needed because a node reboot with chef-client disabled will still overwrite files. 
+
+Disable chef-client on admin, control and compute nodes.  Disable chef-server on admin node.  
+    On each node including admin:
+    # systemctl stop chef-client.service 
+    # systemctl disable chef-client.service
+
+    On admin node:
+    # systemctl stop chef-server.service
+    # systemctl disable chef-server.service
+    
+2. Verify openvswitch 2.4 is installed on control and compute nodes
+    # vi /etc/modprobe.d/10-unsupported-modules.conf
+	change allow_unsupported_modules to 1
+    - Reboot the node
+
+3. On control and compute nodes
+    # systemctl stop openstack-neutron-openvswitch-agent.service
+    # systemctl disable openstack-neutron-openvswitch-agent.service
+    # zypper in python-apicapi openstack-neutron-opflex-agent python-neutron-ml2-driver-apic
+        
+4. On control and compute nodes
+    # vi /etc/neutron/plugins/ml2/openvswitch_agent.ini
+        #tunnel_bridge = br-tunnel  (comment out)
+        local_ip = X.X.X.X          (leave as set)
+        enable_tunneling = False    (add to bottom of [ovs] section)
+        #tunnel_types = XXX         (comment out)
+        #vxlan_udp_port             (already commented out)
+
+5. On control node
+    # vi /etc/neutron/neutron.conf
+        service_plugins = cisco_apic_l3     (change)
+    # vi /etc/neutron/plugins/ml2/ml2_conf.ini
+        type_drivers = opflex,local,flat,vlan,gre,vxlan     (change)
+        tenant_network_types = opflex                       (change)
+        mechanism_drivers = cisco_apic_ml2                  (change)
+    # vi /etc/neutron/dhcp_agent.ini
+        ovs_integration_bridge = br-int (uncomment)
+        enable_isolated_metadata = True (leave as set)
+    # vi /etc/sysconfig/neutron
+        NEUTRON_PLUGIN_CONF="/etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini"    (change)
+        
+6. On control node
+    # mv /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini.orig
+    # vi /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini
+[DEFAULT]
+# NAME USED AS THE ACI TENANT OF OPESTACK SYSTEM FOR AUTOMATED CREATION OF APIC OBJECTS - EXAMPLE is soc6
+apic_system_id=soc6
+
+[opflex]
+networks = *
+
+[ml2_cisco_apic]
+apic_hosts = 10.105.1.10
+apic_username = admin
+apic_password = cisco123
+apic_use_ssl = True
+apic_clear_node_profiles = True
+enable_aci_routing = True
+apic_arp_flooding = True
+apic_name_mapping = use_name
+enable_optimized_metadata = True
+apic_provision_infra = True
+apic_provision_hostlinks = True
+
+# UPDATE FOLLOWING LINES LATER WITH OUTPUT FROM LLDPDCTL
+[apic_switch:101]
+compute01=1/2
+
+[apic_switch:102]
+compute02=1/2
+
+7. On control
+    # source .openrc
+    # su neutron -s /bin/sh -c "/usr/bin/apic-ml2-db-manage \
+     --config-file /etc/neutron/neutron.conf \
+     --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+     --config-file /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini upgrade head"
+    # systemctl disable openstack-neutron-l3-agent.service
+    # systemctl stop openstack-neutron-l3-agent.service
+    # systemctl disable openstack-neutron-metadata-agent.service 
+    # systemctl stop openstack-neutron-metadata-agent.service
+    # systemctl enable openstack-neutron-dhcp-agent.service
+    # systemctl restart openstack-neutron-dhcp-agent.service
+    # systemctl restart openstack-neutron.service
+
+THE apic_system_id OBJECT WILL BE CREATED IN THE APIC WEB INTERFACE WITHIN VM NETWORKING | INVENTORY | OPENSTACK
+
+
+
+
+8. On compute nodes
+    # zypper in libmodelgbp0 supervisor agent-ovs lldpd
+
+        
+9. On compute nodes
+    # vi /etc/opflex-agent-ovs/conf.d/10-opflex-agent-ovs.conf
+        Replace:
+            <@opflex_apic_domain_name>  = apic_system_id from above
+            <@hostname>                 = hostname of compute node
+            <@opflex_peer_ip>           = 10.0.0.30 is default
+            <@opflex_peer_port>         = 8009 is default
+            <@opflex_remote_ip>         = 10.0.0.32 is default
+            <@opflex_remote_port>       = 8472 is default
+{
+    "log": {
+      "level": "debug2"
+    },
+
+    "opflex": {
+    "domain": "comp/prov-OpenStack/ctrlr-[<@opflex_apic_domain_name>]-<@opflex_apic_domain_name>/sw-InsiemeLSOid",
+       "name": "<@hostname>",
+       "peers": [
+          {"hostname": "<@opflex_peer_ip>", "port": "<@opflex_peer_port>"}
+        ],
+       "ssl": {
+          "mode": "enabled",
+          "ca-store": "/etc/ssl/certs/"
+       },
+       "inspector": {
+	   "enabled": true,
+           "socket-name": "/var/run/opflex-agent-ovs-inspect.sock"
+       },
+       "notif": {
+           "enabled": true,
+	   "socket-name": "/var/run/opflex-agent-ovs-notif.sock",
+	   "socket-owner": "neutron",
+	   "socket-group": "opflexep",
+	   "socket-permissions": "770"
+       }
+
+    },
+
+    "endpoint-sources": {
+        "filesystem": ["/var/lib/opflex-agent-ovs/endpoints"]
+    },
+
+    "service-sources": {
+        "filesystem": ["/var/lib/opflex-agent-ovs/services"]
+    },
+
+    "renderers": {
+         "stitched-mode": {
+             "ovs-bridge-name": "br-int",
+
+             "encap": {
+                 "vxlan" : {
+                     "encap-iface": "br-int_vxlan0",
+		     "uplink-iface": "vlan.4093",
+                     "uplink-vlan": 4093,
+                     "remote-ip": "<@opflex_remote_ip>",
+                     "remote-port": <@opflex_remote_port>
+                 }
+             },
+             "forwarding": {
+	         "virtual-router": {
+		     "enabled": true,
+                     "mac": "00:22:bd:f8:19:ff",
+                     "ipv6": {
+		         "router-advertisement": "false"
+		     }
+		 },
+		 "virtual-dhcp": {
+   		     "enabled": "true",
+		     "mac": "00:22:bd:f8:19:ff"
+		 }
+             },
+             "flowid-cache-dir": "/var/lib/opflex-agent-ovs/ids",
+             "mcast-group-file": "/var/lib/opflex-agent-ovs/mcast/opflex-groups.json"
+        }
+    }
+}
+
+10. On compute nodes
+    - Go into YAST | System | Network Settings
+    - Select eth device connected to the ACI fabric
+    - Select "No Link and IP Setup"
+    - In General tab | Set MTU = 1600
+    - Save changes for that network device
+    - Add a vlan device
+    - Configuration name = vlan.4093
+    - Select eth device for "Real Interface for VLAN"
+    - Enter "4093" for the VLAN ID
+    - Select "Dynamic Address - DHCP"
+    - In General tab | Set MTU = 1600
+    - Save changes for new VLAN device
+    - Exit Network Settings
+    - Go back into Network Setttings
+    - Go into Routing tab
+    - Add an entry to the Routing Table
+        Destination     224.0.0.0
+        Genmask         240.0.0.0
+        Gateway         0.0.0.0
+        Device          vlan.4093
+    - Save and exit Network Settings
+    - Exit YAST
+    # ip a show dev vlan.4093
+        - Verify that the interface has an IP address from the ACI fabric
+    
+11. On compute nodes
+    # systemctl start lldpd.service
+    # lldpctl
+        - Be patient because it take a time to scan LLDP neighbors
+    - Make a note of PortDescr: line for the eth interface from step 12 which may looks similar to:
+        topology/pod-1/paths-101/pathep-[eth1/2]
+
+12. On control
+    # vi /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini
+    - Update 101 in the line [apic_switch:101] to match number in paths-XXX
+        - Example: paths-102 would result in [apic_switch:102]
+        - Add multiple [apic_switch:XXX] if nodes are on different paths
+    - Update compute01=1/2 to <hostname of compute node>=<X/X from [eth1/2]>
+        - Example: hostname of test1 and [eth1/33] would result in test1=1/33
+        - Add multiple <hostname>=X/X under one apic_switch if part of the same path number
+    - Remove any invalid apic_switch and hostname entries from example
+    # systemctl restart openstack-neutron-dhcp-agent.service
+    # systemctl restart openstack-neutron.service
+    
+13. On compute nodes
+    # ovs-vsctl list-br
+    # ovs-vsctl del-br br-tunnel
+        - Only needed if br-tunnel exists
+    # ovs-vsctl add-br br-tunnel
+    # ovs-vsctl set bridge br-int protocols=[]
+    # systemctl enable neutron-opflex-agent
+    # systemctl start neutron-opflex-agent
+    # systemctl enable agent-ovs
+    # systemctl start agent-ovs
+    - Reboot the compute node
+        Confirm that services on compute node start properly after a reboot
+    *** May need to be done after every reboot - possibly a bug - check /var/log/neutron/opflex-agent.log for errors
+        # mkdir /var/run/neutron
+        # chown neutron.neutron /var/run/neutron
+        # chown -R neutron.neutron /var/lib/opflex-agent-ovs/
+    # ovs-vsctl add-port br-int br-int_vxlan0 -- set Interface br-int_vxlan0 type=vxlan options:remote_ip=flow options:key=flow options:dst_port=8472
+    # ovs-vsctl show 
+        Verify that br-int_vxlan0 interface is created
+        
+14. In horizon dashboard
+    - Create a new network (Project | Network | Networks)
+    - Verify that the network is created in the APIC web interface under Tenants
+    - Start instances on each compute node within the same project that are attached to the new network
+    - Confirm the instances and ping their gateway and each other
+    
+
+GBP INSTALLATION NOTES
+
+- started with working ML2 configuration
+- on control node
+    # zypper in openstack-neutron-gbp python-gbpclient openstack-heat-gbp openstack-horizon-plugin-gbp-ui
+The following 8 NEW packages are going to be installed:
+  openstack-heat-gbp openstack-horizon-plugin-gbp-ui openstack-neutron-gbp python-gbpclient python-heat-gbp
+  python-horizon-plugin-gbp-ui python-mox3 python-neutron-gbp
+    # vi /etc/neutron/neutron.conf
+        service_plugins = group_policy,servicechain,apic_gbp_l3     (change)
+    # vi /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini
+        Add to bottom of file
+[group_policy]
+policy_drivers = implicit_policy,apic
+
+[group_policy_implicit_policy]
+default_ip_pool = 192.168.0.0/16
+    # vi /etc/neutron/plugins/ml2/ml2_conf.ini
+        mechanism_drivers = apic_gbp        (change)
+    # systemctl restart openstack-neutron.service
+    
