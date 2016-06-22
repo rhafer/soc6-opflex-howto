@@ -61,7 +61,6 @@ Prerequsites
 3. Install openvswitch packages manually on control and compute nodes
         openvswitch-gbp variants only
             # zypper in openvswitch-gbp openvswitch-gbp-switch openvswitch-gbp-kmp-default
-                *** AUTOMATICALLY INSTALLING openvswitch-kmp-default BUT I BELIEVE YOU DO NOT WANT THAT
             # modinfo openswitch 
                 version must be 2.4.1.gbp
                 
