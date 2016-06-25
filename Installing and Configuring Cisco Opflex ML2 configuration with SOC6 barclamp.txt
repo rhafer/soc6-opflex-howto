@@ -59,10 +59,10 @@ Prerequsites
         - Verify that the interface has an IP address from the ACI fabric
         
 3. Install openvswitch packages manually on control and compute nodes
-        openvswitch-gbp variants only
-            # zypper in openvswitch-gbp openvswitch-gbp-switch openvswitch-gbp-kmp-default
-            # modinfo openswitch 
-                version must be 2.4.1.gbp
+    # vi /etc/modprobe.d/10-unsupported-modules.conf
+	change allow_unsupported_modules to 1
+    # zypper in openvswitch openvswitch-switch openvswitch-kmp-default
+    # modinfo openvswitch
 
 4. Create required ovs bridges
     - on control node:
@@ -119,8 +119,7 @@ Prerequsites
                         } 
                     } 
                 }
-            }
-        }
+            },
 
         - Edit the hosts, system_id, username, password and apic_switches to match ACI fabric
             For the apic_switches section:
@@ -136,10 +135,16 @@ Prerequsites
         - Edit the deployment if the automatic selection somehow didn't work (drag and drop nodes to the different roles as required)
         - Apply either by clicking "Apply" in the WebUI or by running:
             # crowbar neutron proposal commit default
-        - Return to the Crowbar web interface and apply the neutron barclamp
-            *** FAILED - SEE TROUBLESHOOTING SECTION
+        - Return to the Crowbar web interface and apply the neutron barclamp and remaining barclamps
+            IF NOVA BARCLAMP FAILS SEE TROUBLESHOOTING SECTION
                 
 7. In horizon dashboard
+    - On admin node
+        # scp SLES_12_SP1_JeOS_OpenStack-no-cloud-init.x86_64-0.0.4.qcow2 soc-control:/root
+    - On control node
+        # source .openrc
+        # glance image-create --name sles-jeos --file SLES_12_SP1_JeOS_OpenStack-no-cloud-init.x86_64-0.0.4.qcow2 --disk-format qcow2 --container-format=bare
+        - Make image public in web interface
     - Create a new network (Project | Network | Networks)
     - Verify that the network is created in the APIC web interface under Tenants
     - Start instances on each compute node within the same project that are attached to the new network
@@ -156,50 +161,13 @@ Failed to apply the proposal to: dcc-46-d6-c0-6a-87.cloud.cisco-aci.lab
 [2016-06-21T14:48:53-07:00] FATAL: Stacktrace dumped to /var/chef/cache/chef-stacktrace.out 
 [2016-06-21T14:48:53-07:00] FATAL: Chef::Exceptions::Exec: service[nova-compute] (nova::compute line 23) had an error: Chef::Exceptions::Exec: /bin/systemctl start openstack-nova-compute returned 6, expected 0
         systemctl lists no available openstack services
-        on compute01
+        on all compute nodes
             # systemctl daemon-reload
             # systemctl daemon-reexec
-        Reapplied barclamp but to only compute01 and it worked
-        Tried adding compute02 and reapply but it failed
-        Reapplied with only compute02 and it did not worked
-        Reapplied barclamp but to only compute01 and it worked
-        on compute02
-            # systemctl daemon-reload
-            # systemctl daemon-reexec
-        Added compute02, reapplied and it worked
-    - default router and networks were created
-        edited proposal, reapplied and default network still exist
-            "create_default_networks": false,
-        manually deleted and reapplied to see if they return
-            they did not return
-        WOULD YOU LIKE TO FIX IN DOCUMENTATION OR OTHER?
-    - Created net101 in horizon but APIC showed network as vlan but customer wants vxlan
-        deleted net101 and confirmed it removed from apic
-        edit neutron barclamp, deselect vlan from Modular Layer 2 type drivers and reapplied
-        recreated net101 and but still a vlan
-        removed vxlan from barclamp, only opflex for Modular Layer 2 type drivers and reapplied
-        recreated net101 and but still a vlan
-        created net102 and still a vlan
-        NEED TO LOOK INTO CONFIG FILES AS TO WHY THIS IS NOT VXLAN
-            disabled chef-client on control and compute nodes
-            Stop neutron-opflex-agent and agent-ovs on compute nodes
-            Stop openstack-neutron-dhcp-agent.service and openstack-neutron.service on control node
-            on control node
-                /etc/neutron/plugins/ml2/ml2_conf.ini
-                    type_drivers = opflex,flat changed to type_drivers = opflex,local,flat,vlan,gre,vxlan
-                /etc/neutron/dhcp_agent.ini
-                    uncomment ovs_integration_bridge = br-int
-            Start openstack-neutron-dhcp-agent.service and openstack-neutron.service on control node
-            Start neutron-opflex-agent and agent-ovs on compute nodes
-         created net101 and it is vxlan
-    - Attempt to start instances and they will not start
-        Permissions error in /var/log/neutron/opflex-agent.log for /var/run/neutron
-            # mkdir /var/run/neutron
-            # chown neutron.neutron /var/run/neutron
-            # chown -R root.neutron /var/lib/opflex-agent-ovs/
-    - Instances start but do not get an ip address
-        /var/log/neutron/neutron-server.log errors
-2016-06-21 22:21:52.146 9921 INFO neutron.plugins.ml2.plugin [req-04bab362-a416-4250-875d-459ad5f4743a - - - - -] Attempt 9 to bind port 3f0ed47c-9f06-4043-85a8-011d06991851
-2016-06-21 22:21:52.151 9921 ERROR neutron.plugins.ml2.managers [req-04bab362-a416-4250-875d-459ad5f4743a - - - - -] Failed to bind port 3f0ed47c-9f06-4043-85a8-011d06991851 on host d52-54-00-08-dc-54 for vnic_type normal using segments [{'segmentation_id': None, 'physical_network': u'physnet1', 'id': u'b2cfb3da-7e50-4742-a0c0-5b53878f7f57', 'network_type': u'opflex'}]
-2016-06-21 22:21:52.151 9921 INFO neutron.plugins.ml2.plugin [req-04bab362-a416-4250-875d-459ad5f4743a - - - - -] Attempt 10 to bind port 3f0ed47c-9f06-4043-85a8-011d06991851
-2016-06-21 22:21:52.156 9921 ERROR neutron.plugins.ml2.managers [req-04bab362-a416-4250-875d-459ad5f4743a - - - - -] Failed to bind port 3f0ed47c-9f06-4043-85a8-011d06991851 on host d52-54-00-08-dc-54 for vnic_type normal using segments [{'segmentation_id': None, 'physical_network': u'physnet1', 'id': u'b2cfb3da-7e50-4742-a0c0-5b53878f7f57', 'network_type': u'opflex'}]
+        Reapply and the barclamp will complete successfully
+    - Instances ping gateway and other instances unreliable
+    /var/log/neutron/opflex-agent.log
+2016-06-24 21:23:36.629 4790 INFO opflexagent.gbp_ovs_agent [req-714cda83-0da4-4d01-bd9f-518b0b8bd57e - - - - -] Agent out of sync with plugin!
+        USED OVS2.4 THAT I BUILT BUT MAY NOT BE NECESSARY
+        IS IT AS SIMPLE AS REBOOTING IT?
+        
