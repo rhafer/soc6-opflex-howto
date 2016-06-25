@@ -255,17 +255,17 @@ THE apic_system_id OBJECT WILL BE CREATED IN THE APIC WEB INTERFACE WITHIN VM NE
     # systemctl start neutron-opflex-agent
     # systemctl enable agent-ovs
     # systemctl start agent-ovs
-    - Reboot the compute node
-        Confirm that services on compute node start properly after a reboot
-    *** May need to be done after every reboot - possibly a bug - check /var/log/neutron/opflex-agent.log for errors
-        # mkdir /var/run/neutron
-        # chown neutron.neutron /var/run/neutron
-        # chown -R neutron.neutron /var/lib/opflex-agent-ovs/
     # ovs-vsctl add-port br-int br-int_vxlan0 -- set Interface br-int_vxlan0 type=vxlan options:remote_ip=flow options:key=flow options:dst_port=8472
     # ovs-vsctl show 
         Verify that br-int_vxlan0 interface is created
         
 14. In horizon dashboard
+    - On admin node
+        # scp SLES_12_SP1_JeOS_OpenStack-no-cloud-init.x86_64-0.0.4.qcow2 soc-control:/root
+    - On control node
+        # source .openrc
+        # glance image-create --name sles-jeos --file SLES_12_SP1_JeOS_OpenStack-no-cloud-init.x86_64-0.0.4.qcow2 --disk-format qcow2 --container-format=bare
+        - Make image public in web interface
     - Create a new network (Project | Network | Networks)
     - Verify that the network is created in the APIC web interface under Tenants
     - Start instances on each compute node within the same project that are attached to the new network
@@ -274,12 +274,12 @@ THE apic_system_id OBJECT WILL BE CREATED IN THE APIC WEB INTERFACE WITHIN VM NE
 
 GBP INSTALLATION NOTES
 
-- started with working ML2 configuration
-- on control node
+Prerequsites
+- Start with working ML2 configuration
+    Not necessary but good to know configuration is working
+
+1. On control node
     # zypper in openstack-neutron-gbp python-gbpclient openstack-heat-gbp openstack-horizon-plugin-gbp-ui
-The following 8 NEW packages are going to be installed:
-  openstack-heat-gbp openstack-horizon-plugin-gbp-ui openstack-neutron-gbp python-gbpclient python-heat-gbp
-  python-horizon-plugin-gbp-ui python-mox3 python-neutron-gbp
     # vi /etc/neutron/neutron.conf
         service_plugins = group_policy,servicechain,apic_gbp_l3     (change)
     # vi /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini
@@ -291,5 +291,14 @@ policy_drivers = implicit_policy,apic
 default_ip_pool = 192.168.0.0/16
     # vi /etc/neutron/plugins/ml2/ml2_conf.ini
         mechanism_drivers = apic_gbp        (change)
+    # su neutron -s /bin/sh -c "/usr/bin/gbp-db-manage \
+     --config-file /etc/neutron/neutron.conf \
+     --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+     --config-file /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini upgrade head"
     # systemctl restart openstack-neutron.service
+    # rcapache2 restart
     
+2. In horizon dashboard
+    - HAVE IFTI SHOW HOW TO CREATE GBP
+    - Start instances on each compute node within the same project that are attached to the new network
+    - Confirm the instances and ping their gateway and each other
