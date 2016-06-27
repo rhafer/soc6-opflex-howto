@@ -162,7 +162,6 @@ Failed to apply the proposal to: dcc-46-d6-c0-6a-87.cloud.cisco-aci.lab
         systemctl lists no available openstack services
         on all compute nodes
             # systemctl daemon-reload
-            # systemctl daemon-reexec
         Reapply and the barclamp will complete successfully
     - Instances ping gateway and other instances unreliable
     /var/log/neutron/opflex-agent.log
