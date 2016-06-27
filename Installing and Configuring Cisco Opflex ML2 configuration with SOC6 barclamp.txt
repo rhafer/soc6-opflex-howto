@@ -63,23 +63,30 @@ Prerequsites
 	change allow_unsupported_modules to 1
     # zypper in openvswitch openvswitch-switch openvswitch-kmp-default
     # modinfo openvswitch
-
+        Must be 2.4.1
+    
 4. Create required ovs bridges
     - on control node:
         # systemctl start openvswitch
+        # systemctl enable openvswitch
         # ovs-vsctl add-br br-int
     - on compute nodes:
         # systemctl start openvswitch
+        # systemctl enable openvswitch
         # ovs-vsctl add-br br-int
         # ovs-vsctl set bridge br-int protocols=[]
         # ovs-vsctl add-port br-int br-int_vxlan0 -- set Interface br-int_vxlan0 type=vxlan options:remote_ip=flow options:key=flow options:dst_port=8472
+        # lsmod | grep openvswitch
+            Verify a line of the output shows
+                openvswitch           130813  1 vport_vxlan
+
                 
 5. On compute nodes
     # zypper in lldpd
     # systemctl start lldpd.service
     # lldpctl
         - Be patient because it take a time to scan LLDP neighbors
-    - Make a note of PortDescr: line for the eth interface(s) on the ACI fabric. An exmaple is:
+    - Make a note of PortDescr: line for the eth interface(s) on the ACI fabric. An example is:
         topology/pod-1/paths-101/pathep-[eth1/33]
 
 6. Deploy all pertainent OpenStack barclamps using Crowbar web interface.  For the Neutron barclamp:
