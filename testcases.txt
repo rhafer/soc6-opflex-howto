@@ -1,0 +1,59 @@
+For each test, gather the following into /tmp/test<#>_<node_name>
+
+On each node
+# supportconfig  - (this should catch almost all of the information we need)
+# mkdir /tmp/test1_compute02
+# mv /var/log/nts_dcc-46-d6-c0-6a-87_160627_1242.tbz /tmp/test1_compute02
+
+On control node
+# cp /etc/neutron/plugins/ml2/openvswitch_agent.ini \
+ /etc/neutron/neutron.conf \
+ /etc/neutron/plugins/ml2/ml2_conf.ini \
+ /etc/neutron/dhcp_agent.ini \
+ /etc/sysconfig/neutron \
+ /etc/neutron/plugins/ml2/ml2_conf_cisco_apic.ini /tmp/test1_soc-control
+
+On compute nodes
+# cp /etc/opflex-agent-ovs/conf.d/10-opflex-agent-ovs.conf /tmp/test1_compute02/
+# ovs-vsctl show > /tmp/test1_compute02/ovs-vsctl_show.out
+
+Gather all information onto the admin node
+# mkdir -p ~/tests/test1
+# cd ~/tests/test1
+# scp -r soc-control:/tmp/test1_soc-control .
+# scp -r compute01:/tmp/test1_compute01 .
+# scp -r compute02:/tmp/test1_compute02 .
+
+
+
+Test 1:  Use Installing and Configuring Cisco Opflex with SOC6 manually.txt with Ralf's OBS repo and my manually built OVS 2.4.0.  Use "crowbar batch build soc6-deployed-2.yaml" to deploy gre configuration.
+        Install and configuration completed without error
+        vxlan network was created in the apic for 192.168.101.0 network
+        successful start of two jeos instances
+        instances unable to reliably ping the gateway or the other instance on the other compute node
+        terminate instances and delete network
+        reboot compute nodes
+        vxlan network was created in the apic for 192.168.102.0 network
+        successful start of two jeos instances
+        instances reliably ping the gateway or the other instance on the other compute node
+        SUCCESS!!
+
+Test 2:  If Test 1 success - Upgrade to OVS 2.4.1 in Ralf'sOBS repo.  Remember to remove 2.4.0 KMP and reboot the nodes and make sure the correct OVS version and kernel module are being used.
+        Terminate instances and delete network
+        replace ovs2.4.0 with ovs2.4.1 rpms in ptf repo and createrepo-cloud-ptf
+        On control and compute nodes
+            # zypper in openvswitch-2.4.1-7.1.x86_64 openvswitch-kmp-default-2.4.1_k3.12.49_11-7.1.x86_64 openvswitch-switch-2.4.1-7.1.x86_64
+            # zypper rm openvswitch-kmp-default-2.4.0_k3.12.53_60.30-1.1.x86_64
+            # zypper in -f openvswitch-2.4.1-7.1.x86_64 openvswitch-kmp-default-2.4.1_k3.12.49_11-7.1.x86_64 openvswitch-switch-2.4.1-7.1.x86_64
+            reboot node
+        Verified all node have ovs 2.4.1 running 
+        vxlan network was created in the apic for 192.168.103.0 network
+        successful start of two jeos instances
+        instances reliably ping the gateway or the other instance on the other compute node
+        SUCCESS!!
+
+Test 3: Deploy and test ACI lab using "crowbar batch build soc6-deployed-2-apic.yaml" and following Installing and Configuring Cisco Opflex ML2 configuration with SOC6 barclamp.txt
+
+
+Test 4: Adapt ML2 configuration to GBP from barclamp deployed environment using GBP INSTALLATION NOTES in Installing and Configuring Cisco Opflex with SOC6 manually.txt
+        
