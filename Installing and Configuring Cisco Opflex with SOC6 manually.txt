@@ -1,5 +1,5 @@
 Installing and Configuring the Cisco Opflex with SUSE OPENSTACK CLOUD 6
-Version 0.5
+Version 0.6
 Author: Mike Friesenegger (mikef@suse.com)
 
 
@@ -270,6 +270,18 @@ THE apic_system_id OBJECT WILL BE CREATED IN THE APIC WEB INTERFACE WITHIN VM NE
     - Verify that the network is created in the APIC web interface under Tenants
     - Start instances on each compute node within the same project that are attached to the new network
     - Confirm the instances and ping their gateway and each other
+        SEE TROUBLESHOOTING SECTION IF INSTANCES UNABLE TO PING
+        
+
+TROUBLESHOOTING SECTION
+
+If the instances are unable to ping the gateway or another instance on a different compute node at all or pings are unreliable
+    - Terminate instances
+    - Delete network
+    - Reboot compute nodes
+    - Create new network
+    - Start instances
+    - They will be able to ping their gateway and other instance
     
 
 GBP INSTALLATION NOTES
