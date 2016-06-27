@@ -97,8 +97,7 @@ Prerequsites
             ],
             "ml2_type_drivers": [
                 "opflex",
-                "vxlan",
-                "vlan"
+                "vxlan"
             ],
             "ml2_type_drivers_default_provider_network": "opflex",
             "ml2_type_drivers_default_tenant_network": "opflex",
