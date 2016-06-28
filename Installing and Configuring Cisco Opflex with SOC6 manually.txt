@@ -313,7 +313,19 @@ default_ip_pool = 192.168.0.0/16
     # rcapache2 restart
     
 2. In horizon dashboard
-    - Verify Project | Policy exists
-    - HAVE IFTI SHOW HOW TO CREATE GBP
-    - Start instances on each compute node within the same project that are attached to the new network
-    - Confirm the instances and ping their gateway and each other
+    - Verify Project | Policy | Groups exist
+        - Create two groups - web and db
+    - Policy | Application Policy | Policy Actions
+        - Create an allow policy taking all defaults
+    - Policy | Application Policy | Policy Classifiers
+        - Create two bi-directional classifiers one for tcp and the other for icmp protocol
+    - Policy | Application Policy | Policy Rules
+        - Create two rules (icmp and tcp) linking the specific policy classifier to the allow policy action
+    - Policy | Application Policy | Policy Rule Set
+        - Create a dbaccess rule set that links to the tcp and icmp rules
+    - Policy | Groups
+        - Edit each group so that the db group is the rule set provider and the web group is the rule set consumer
+        - Click on the web group and the db group then select Create Member to deploy instances  (deploy 2 instances for each group)
+    - Confirm a web instance can ping its gateway, the other web instance and the db instances
+        - Remove the dbaccess rule set from the Consumed Rule Set for the web group to see the pings stop
+        - Readd the dbaccess rule set to see the pings start
