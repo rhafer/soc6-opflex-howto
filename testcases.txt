@@ -66,4 +66,8 @@ Test 3: Deploy and test ACI lab using "crowbar batch build soc6-deployed-2-apic.
         SUCCESS!!
 
 Test 4: Adapt ML2 configuration to GBP from barclamp deployed environment using GBP INSTALLATION NOTES in Installing and Configuring Cisco Opflex with SOC6 manually.txt
-        
+        terminate instances and delete network
+        follow manual configuration steps in Installing and Configuring Cisco Opflex with SOC6 manually.txt
+        disable chef client and chef server
+        can see the Policy menu item under Project
+        NEED TO ASK IFTI FOR QUICK DEMONSTRATION HOW TO TEST GBP
