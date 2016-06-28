@@ -52,8 +52,18 @@ Test 2:  If Test 1 success - Upgrade to OVS 2.4.1 in Ralf'sOBS repo.  Remember t
         instances reliably ping the gateway or the other instance on the other compute node
         SUCCESS!!
 
-Test 3: Deploy and test ACI lab using "crowbar batch build soc6-deployed-2-apic.yaml" and following Installing and Configuring Cisco Opflex ML2 configuration with SOC6 barclamp.txt
-
+Test 3: Deploy and test ACI lab using "crowbar batch build soc6-deployed-2-apic.yaml" and following Installing and Configuring Cisco Opflex ML2 configuration with SOC6 barclamp.txt.
+        Verified OVS 2.4.1 is installed
+        Install and configuration completed without error
+        vxlan network was created in the apic for 192.168.101.0 network
+         successful start of two jeos instances
+        instances unable to reliably ping the gateway or the other instance on the other compute node
+        terminate instances and delete network
+        reboot compute nodes       
+        vxlan network was created in the apic for 192.168.102.0 network
+        successful start of two jeos instances
+        instances reliably ping the gateway or the other instance on the other compute node
+        SUCCESS!!
 
 Test 4: Adapt ML2 configuration to GBP from barclamp deployed environment using GBP INSTALLATION NOTES in Installing and Configuring Cisco Opflex with SOC6 manually.txt
         
