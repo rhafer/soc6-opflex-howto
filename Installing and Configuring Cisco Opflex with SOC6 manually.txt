@@ -302,6 +302,8 @@ policy_drivers = implicit_policy,apic
 [group_policy_implicit_policy]
 default_ip_pool = 192.168.0.0/16
     # vi /etc/neutron/plugins/ml2/ml2_conf.ini
+        type_drivers = opflex,vxlan,vlan,flat   (change)
+        tenant_network_types = opflex,vxlan,vlan    (change)
         mechanism_drivers = apic_gbp        (change)
     # su neutron -s /bin/sh -c "/usr/bin/gbp-db-manage \
      --config-file /etc/neutron/neutron.conf \
@@ -311,6 +313,7 @@ default_ip_pool = 192.168.0.0/16
     # rcapache2 restart
     
 2. In horizon dashboard
+    - Verify Project | Policy exists
     - HAVE IFTI SHOW HOW TO CREATE GBP
     - Start instances on each compute node within the same project that are attached to the new network
     - Confirm the instances and ping their gateway and each other
