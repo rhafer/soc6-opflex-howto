@@ -1,10 +1,10 @@
 Installing and Configuring the Cisco Opflex ML2 Configuration with SUSE OPENSTACK CLOUD 6 barclamp
-Version 0.1
+Version 0.2
 Author: Mike Friesenegger (mikef@suse.com)
 
 
 
-This version of the document focuses are created a reproducible set of steps to deploy and provide a basic configuration of SOC6 with a Cisco ACI fabric.  This document has achieved:
+This version of the document focuses on a reproducible set of steps to deploy and provide a basic configuration of SOC6 with a Cisco ACI fabric.  This document has achieved:
     - Cisco ACI ML2 Liberty driver implementation using SUSE built RPMs
         http://download.opensuse.org/repositories/home:/rhafer:/branches:/Cloud:/OpenStack:/Liberty/SLE_12_SP1
             # wget -r -N -np http://download.opensuse.org/repositories/home:/rhafer:/branches:/Cloud:/OpenStack:/Liberty/SLE_12_SP1") 
@@ -13,7 +13,8 @@ This version of the document focuses are created a reproducible set of steps to 
     - Integration with SOC6
     - Deployment using SOC6 neutron barclamp
     - Creation of OpenStack system object in the Cisco APIC
-    - Creation of the tenant and network in the Cisco APIC based on what was reated in the SOC6 horizon dashboard
+    - Creation of the tenant and network in the Cisco APIC based on what was entered in the SOC6 horizon dashboard
+    - Creation of a vxlan based network in Cisco APIC
     - Ability to start instances on different compute nodes that can ping their gateway and each other
     
 Future versions of this document will address (in no particular order):
@@ -95,44 +96,45 @@ Prerequsites
         # crowbar neutron proposal edit default
 
     Set the following values (leave everything else set to the defaults):
-        "neutron": {
-            "create_default_networks": false,
-            "dhcp_domain": "cloud.cisco-aci.lab",
-            "use_lbaas": false,
-            "ml2_mechanism_drivers": [
-                "cisco_apic_ml2"
-            ],
-            "ml2_type_drivers": [
-                "opflex",
-                "vxlan"
-            ],
-            "ml2_type_drivers_default_provider_network": "opflex",
-            "ml2_type_drivers_default_tenant_network": "opflex",
-            "apic": {
-                "hosts": "10.105.1.10",
-                "system_id": "soc6",
-                "username": "admin",
-                "password": "cisco123"
-            },
-            "apic_switches": {
-                "101": {
-                    "switch_ports": {
-                        "d58-ac-78-f2-61-6d": {
-                            "switch_port": "1/2"
-                        },
-                        "dcc-46-d6-c0-6a-87": {
-                            "switch_port": "1/33"
-                        } 
-                    } 
-                }
-            },
+{
+  "create_default_networks": false,
+  "dhcp_domain": "cloud.cisco-aci.lab",
+  "use_lbaas": false,
+  "ml2_mechanism_drivers": [
+    "cisco_apic_ml2"
+  ],
+  "ml2_type_drivers": [
+    "opflex",
+    "vxlan"
+  ],
+  "ml2_type_drivers_default_provider_network": "opflex",
+  "ml2_type_drivers_default_tenant_network": "opflex",
+  "apic": {
+    "hosts": "10.105.1.10",
+    "system_id": "soc6",
+    "username": "admin",
+    "password": "cisco123"
+  },
+  "apic_switches": {
+    "101": {
+      "switch_ports": {
+        "d58-ac-78-f2-61-6d": {
+          "switch_port": "1/2"
+        },
+        "dcc-46-d6-c0-6a-87": {
+          "switch_port": "1/33"
+        }
+      }
+    }
+  }
+}
 
         - Edit the hosts, system_id, username, password and apic_switches to match ACI fabric
             For the apic_switches section:
                 - Update 101 and create any new sections like 101 to match number(s) in paths-XXX
                     Example: paths-101 and paths-102 would result in keeping the 101 section and adding a new 102 section
                 - Update mac address entry with output for each host and the switch port it is connected to
-                    Example: get hostname of compute node by using "hostname" command and [eth1/33] from exmaple above would result in
+                    Example: get hostname of compute node by using "hostname" command and [eth1/33] from example above would result in
                         "dcc-46-d6-c0-6a-87": {
                           "switch_port": "1/33"
                         },
@@ -159,7 +161,7 @@ Prerequsites
     
 
 TROUBLESHOOTING FROM THIS ATTEMPT
-    - Applying the nova barclamp to both nodes at one time failed on first attempt to apply barclamp
+    - Applying the nova barclamp will fail on the first attempt to apply barclamp
 Failed to apply the proposal to: dcc-46-d6-c0-6a-87.cloud.cisco-aci.lab 
 [2016-06-21T14:48:53-07:00] ERROR: Running exception handlers 
 [2016-06-21T14:48:53-07:00] FATAL: Saving node information to /var/chef/cache/failed-run-data.json 
@@ -170,9 +172,11 @@ Failed to apply the proposal to: dcc-46-d6-c0-6a-87.cloud.cisco-aci.lab
         on all compute nodes
             # systemctl daemon-reload
         Reapply and the barclamp will complete successfully
-    - Instances ping gateway and other instances unreliable
-    /var/log/neutron/opflex-agent.log
-2016-06-24 21:23:36.629 4790 INFO opflexagent.gbp_ovs_agent [req-714cda83-0da4-4d01-bd9f-518b0b8bd57e - - - - -] Agent out of sync with plugin!
-        USED OVS2.4 THAT I BUILT BUT MAY NOT BE NECESSARY
-        IS IT AS SIMPLE AS REBOOTING IT?
+    - If the instances are unable to ping the gateway or another instance on a different compute node at all or pings are unreliable
+        - Terminate instances
+        - Delete network
+        - Reboot compute nodes
+        - Create new network
+        - Start instances
+        - They will be able to ping their gateway and other instance
         
