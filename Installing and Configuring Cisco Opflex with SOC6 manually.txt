@@ -289,6 +289,7 @@ GBP INSTALLATION NOTES
 Prerequsites
 - Start with working ML2 configuration
     Not necessary but good to know configuration is working
+    BE SURE TO REMOVE ALL NETWORKS CREATED DURING ML2 TESTING
 
 1. On control node
     # zypper in openstack-neutron-gbp python-gbpclient openstack-heat-gbp openstack-horizon-plugin-gbp-ui
