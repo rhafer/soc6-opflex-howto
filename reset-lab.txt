@@ -1,0 +1,61 @@
+CROWBAR NODES:
+compute01    d58-ac-78-f2-61-6d.cloud.cisco-aci.lab
+compute02    dcc-46-d6-c0-6a-87.cloud.cisco-aci.lab
+soc-control  d52-54-00-08-dc-54.cloud.cisco-aci.lab
+
+
+POWER OFF COMPUTE NODES
+ssh admin@10.105.1.51/52
+# scope chassis
+# power off
+NOTE: # power ?
+    Shows list of power options
+    # power off
+    # power on
+    # power cycle
+
+POWER OFF SOC-CONTROL AND RESET DISKS ON KVM HOST
+# virsh destory soc-control
+# cd /home/vms
+# qemu-img create -f qcow2 soc-control.qcow2 20G
+# qemu-img create -f qcow2 soc-control-cinder.qcow2 40G
+
+CLEANUP CROWBAR ON ADMIN
+# systemctl start chef-server.service
+# systemctl start chef-client.service
+# crowbar machines delete compute02
+# crowbar machines delete compute01
+# crowbar machines delete soc-control
+*** NOT SURE THIS WORKS LIKE I THINK IT SHOULD BECAUSE NEW PROPOSALS DID NOT DEPLOY PROPERLY AFTER REBUILDING THE SYSTEM
+# crowbar horizon proposal delete default
+# crowbar nova proposal delete default
+# crowbar neutron proposal delete default
+# crowbar cinder proposal delete default
+# crowbar glance proposal delete default
+# crowbar keystone proposal delete default
+# crowbar rabbitmq proposal delete default
+# crowbar database proposal delete default
+
+POWER ON SOC-CONTROL AND COMPUTE NODES
+# virsh start soc-control
+ssh admin@10.105.1.51/52
+# scope chassis
+# power on
+
+CLEANUP CISCO APIC
+TENANTS
+    ALL TENANTS
+    Find any tenants that begin with _soc6_, right click on it and Delete
+VM NETWORKING
+    POLICIES
+        VM OPENSTACK PROVIDER
+        Right click on soc6 and Delete
+        Select Yes without changing option
+
+ALLOCATE CROWBAR MACHINES WITH NAMES AND ROLES
+    TO DO
+    
+DEPLOY PROPOSALS
+# crowbar network allocate_ip default d52-54-00-08-dc-54.cloud.cisco-aci.lab external host
+    Do a chef-client on soc-control to apply the change
+# crowbar batch build soc6-deployed.yaml
