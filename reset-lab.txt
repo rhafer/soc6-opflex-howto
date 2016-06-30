@@ -21,20 +21,29 @@ POWER OFF SOC-CONTROL AND RESET DISKS ON KVM HOST
 # qemu-img create -f qcow2 soc-control-cinder.qcow2 40G
 
 CLEANUP CROWBAR ON ADMIN
-# systemctl start chef-server.service
-# systemctl start chef-client.service
-# crowbar machines delete compute02
-# crowbar machines delete compute01
-# crowbar machines delete soc-control
-*** NOT SURE THIS WORKS LIKE I THINK IT SHOULD BECAUSE NEW PROPOSALS DID NOT DEPLOY PROPERLY AFTER REBUILDING THE SYSTEM
-# crowbar horizon proposal delete default
-# crowbar nova proposal delete default
-# crowbar neutron proposal delete default
-# crowbar cinder proposal delete default
-# crowbar glance proposal delete default
-# crowbar keystone proposal delete default
-# crowbar rabbitmq proposal delete default
-# crowbar database proposal delete default
+systemctl start chef-server.service
+systemctl start chef-client.service
+sleep 5
+crowbar machines delete compute02
+crowbar machines delete compute01
+crowbar machines delete soc-control
+sleep 15
+crowbar horizon delete default
+crowbar horizon proposal delete default
+crowbar nova delete default
+crowbar nova proposal delete default
+crowbar neutron delete default
+crowbar neutron proposal delete default
+crowbar cinder delete default
+crowbar cinder proposal delete default
+crowbar glance delete default
+crowbar glance proposal delete default
+crowbar keystone delete default
+crowbar keystone proposal delete default
+crowbar rabbitmq delete default
+crowbar rabbitmq proposal delete default
+crowbar database delete default
+crowbar database proposal delete default
 
 POWER ON SOC-CONTROL AND COMPUTE NODES
 # virsh start soc-control
@@ -58,4 +67,8 @@ ALLOCATE CROWBAR MACHINES WITH NAMES AND ROLES
 DEPLOY PROPOSALS
 # crowbar network allocate_ip default d52-54-00-08-dc-54.cloud.cisco-aci.lab external host
     Do a chef-client on soc-control to apply the change
-# crowbar batch build soc6-deployed.yaml
+# crowbar batch build <filename>.yaml
+    soc6-deployed-2.yaml = deployment with gre
+    soc6-deployed-2-apic.yaml = deployment with cisco_apic_ml2
+    soc6-deployed-apic-upto-neutron.yaml = deployment with cisco_apic_ml2
+    soc6-deployed-apic-after-neutron.yaml = deployment with cisco_apic_ml2
