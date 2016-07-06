@@ -6,8 +6,8 @@ Author: Mike Friesenegger (mikef@suse.com)
 
 This version of the document focuses on a reproducible set of steps to deploy and provide a basic configuration of SOC6 with a Cisco ACI fabric.  This document has achieved:
     - Cisco ACI ML2 Liberty driver implementation using SUSE built RPMs
-        http://download.opensuse.org/repositories/home:/rhafer:/branches:/Cloud:/OpenStack:/Liberty/SLE_12_SP1
-            # wget -r -N -np http://download.opensuse.org/repositories/home:/rhafer:/branches:/Cloud:/OpenStack:/Liberty/SLE_12_SP1") 
+        http://download.opensuse.org/repositories/Cloud:/OpenStack:/Liberty:/cisco-apic/SLE_12_SP1/
+            # wget -r -N -np "http://download.opensuse.org/repositories/Cloud:/OpenStack:/Liberty:/cisco-apic/SLE_12_SP1/")
                 into /srv/tftpboot/suse-12.1/x86_64/repos/PTF/rpm/ on admin node
             # createrepo-cloud-ptf on the admin node
     - Integration with SOC6
